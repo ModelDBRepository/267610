@@ -1,0 +1,82 @@
+//single HH_simulation
+
+load_file("nrngui.hoc")
+
+create axon
+access axon
+
+gna_f = 0.6
+
+axon {
+	diam=1
+	cm = 1
+
+	insert hhs
+	gl_hhy = 0.0003
+	el_hhy = -54.3
+	tslow_hhy = 1e6
+
+	L = 100
+	nseg = 1
+	gnabar_hhs = 0.12*gna_f 
+	gkbar_hhs = 0.036
+}
+
+
+stim_start = 200
+
+// the purpose is to find parameters causing abnormal spiking
+
+dt = 0.02
+dt_rec  = 0.1
+steps_per_ms = 1/dt
+tstop = 20000
+
+access axon
+nstim = 2000
+fstim(nstim)
+tstart = 500
+isi_stim = 100
+
+strdef tmpstr, outDir, cmd 
+objref outfile,outfile1, vec_ret
+outfile = new File()
+outfile1 = new File()
+
+sprint(outDir,"simdata")
+sprint(cmd, "system(\"mkdir -p %s\")",outDir)
+execute(cmd)
+
+objref v0, m0, h0, n0, s0, smat
+
+  v0 = new Vector()
+  v0.record(&axon.v(0.5),dt_rec)
+  
+  s0 = new Vector()
+  s0.record(&axon.s_hhs(0.5),dt_rec)
+  m0 = new Vector()
+  m0.record(&axon.m_hhs(0.5),dt_rec)
+  h0 = new Vector()
+  h0.record(&axon.h_hhs(0.5),dt_rec)
+  n0 = new Vector()
+  n0.record(&axon.n_hhs(0.5),dt_rec)
+  
+  for i = 0,nstim-1 {
+		fstim(i, 0.5, tstart+i*isi_stim, 0.1, 0.4)
+}
+
+  newPlotV()
+  run()
+  
+  smat = new Matrix()
+  smat.resize(s0.size(),5)
+  smat.setcol(0,v0)
+  smat.setcol(1,s0)
+  smat.setcol(2,m0)
+  smat.setcol(3,h0)
+  smat.setcol(4,n0)
+  
+  sprint(tmpstr,"%s/gna_%04d.dat",outDir,gna_f*1000)
+  outfile.wopen(tmpstr)
+  smat.fprint(outfile, "  %g")
+  outfile.close()

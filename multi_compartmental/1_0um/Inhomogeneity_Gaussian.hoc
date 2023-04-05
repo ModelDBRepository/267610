@@ -1,0 +1,226 @@
+
+load_file("nrngui.hoc")
+
+create AIS
+create axon
+connect AIS(1), axon(0)
+access AIS
+
+forall {
+	diam=1
+	cm = 1
+	Ra = 100
+	insert hhy
+	gl_hhy = 0.0003
+	el_hhy = -54.3
+	tslow_hhy = 1e6
+}
+
+AIS {
+	L = 100
+	nseg = 5
+	gnabar_hhy = 0.12
+	gkbar_hhy = 0.036
+}
+
+a_nseg = 40
+
+axon {
+	L = 5000
+	nseg = a_nseg
+}
+
+n_trial = 3000
+
+
+objref r[2]
+mu = 1
+var = 0.25
+
+for i = 0,1 {
+	a = 123+10
+	r[i] = new Random(a+i)
+	r[i].normal(mu, var)	//mu, mean; variance (squared of standard deviation)
+}
+
+objref fgna_vec, gna_mat,fgk_vec, gk_mat
+gna_mat = new Matrix()
+gk_mat = new Matrix()
+fgna_vec = new Vector(a_nseg)
+fgk_vec = new Vector(a_nseg)
+
+gna_mat.resize(n_trial,a_nseg)
+gk_mat.resize(n_trial,a_nseg)
+
+for i = 0, n_trial-1 {
+	fgna_vec.setrand(r[0])
+	gna_mat.setrow(i,fgna_vec)
+	fgna_vec = new Vector(a_nseg)
+
+	fgk_vec.setrand(r[1])
+	gk_mat.setrow(i,fgk_vec)
+	fgk_vec = new Vector(a_nseg)
+}
+
+stim_start = 200
+
+// the purpose is to find parameters causing abnormal spiking
+
+dt = 0.02
+dt_rec  = 0.1
+steps_per_ms = 1/dt
+tstop = 10000
+
+access AIS
+nstim = 20
+fstim(nstim)
+//fstim(i, loc, delay, duration, stim)
+tstart = 500
+isi_stim = 1000
+
+
+strdef tmpstr, outDir, cmd 
+objref outfile,outfile1, vec_ret
+outfile = new File()
+outfile1 = new File()
+
+sprint(outDir,"simdata_%03d/recovery_var%04d_t%04d",a_nseg, var*1e4,tstart)
+sprint(cmd, "system(\"mkdir -p %s\")",outDir)
+execute(cmd)
+sprint(tmpstr,"%s/gna_param.dat",outDir)
+outfile.wopen(tmpstr)
+gna_mat.fprint(outfile, "  %g")
+outfile.close()
+sprint(tmpstr,"%s/gk_param.dat",outDir)
+outfile.wopen(tmpstr)
+gk_mat.fprint(outfile, "  %g")
+outfile.close()
+
+objref pc
+pc = new ParallelContext()
+
+func distscale() { local key, p1,p2,p3,p4 localobj returnvec
+	key = $1
+	
+	returnvec = new Vector()
+	returnvec = single_comp(key)
+
+	pc.pack(returnvec)
+	
+	pc.post(key)
+	return key
+}
+
+obfunc single_comp() {localobj gna_vec, gk_vec, tem_vec,tem_vec2, prop_vec,v0,v1, v2,v3,v4,v5,v6,v7,v8,v9,v10, vmat
+	
+	key = $1
+
+	gna_vec = new Vector()
+	gk_vec = new Vector()
+
+	tem_vec = gna_mat.getrow(key)
+	gna_vec = tem_vec
+	tem_vec2 = gk_mat.getrow(key)
+	gk_vec = tem_vec2
+
+	for i = 0,nstim-1 {
+		fstim(i, 0, tstart+i*isi_stim, 0.1, 3)
+	}
+	
+	axon {
+		smin_hhy = 20	// the minimum time constant of s gate
+		a2_hhy = 0.2	// the slow inactivation can inactivate to 0.0
+		round = 0
+		for (x,0) {
+			gnabar_hhy(x) = (gna_vec.x[round])*0.12
+			gkbar_hhy(x) = (gk_vec.x[round])*0.036
+			if ((gna_vec.x[round]*0.12)<0) {
+				gnabar_hhy(x) = 0
+			}
+			if ((gk_vec.x[round]*0.036)<0) {
+				gkbar_hhy(x) = 0
+			}
+			round = round+1
+		}
+	}
+
+  v0 = new Vector()
+  v0.record(&axon.v(0),dt_rec)
+  
+  v1 = new Vector()
+  v1.record(&axon.v(0.1),dt_rec)
+  
+  v2 = new Vector()
+  v2.record(&axon.v(0.2),dt_rec)
+  
+  v3 = new Vector()
+  v3.record(&axon.v(0.3),dt_rec)
+
+  v4 = new Vector()
+  v4.record(&axon.v(0.4),dt_rec)
+  
+  v5 = new Vector()
+  v5.record(&axon.v(0.5),dt_rec)
+  
+  v6 = new Vector()
+  v6.record(&axon.v(0.6),dt_rec)
+
+  v7 = new Vector()
+  v7.record(&axon.v(0.7),dt_rec)
+  
+  v8 = new Vector()
+  v8.record(&axon.v(0.8),dt_rec)
+
+  v9 = new Vector()
+  v9.record(&axon.v(0.9),dt_rec)
+
+  v10 = new Vector()
+  v10.record(&axon.v(1),dt_rec)
+  
+  run()
+  
+  vmat = new Matrix()
+  
+
+  vmat.resize(v0.size(),11)
+  vmat.setcol(0,v0)
+  vmat.setcol(1,v1)
+  vmat.setcol(2,v2)
+  vmat.setcol(3,v3)
+  vmat.setcol(4,v4)
+  vmat.setcol(5,v5)
+  vmat.setcol(6,v6)
+  vmat.setcol(7,v7)
+  vmat.setcol(8,v8)
+  vmat.setcol(9,v9)
+  vmat.setcol(10,v10)
+
+  sprint(tmpstr,"%s/key_%04d.dat",outDir,key)
+  outfile.wopen(tmpstr)
+  vmat.fprint(outfile, "  %g")
+  outfile.close()
+
+  prop_vec = new Vector()
+  return prop_vec
+}
+
+pc.runworker()
+
+vec_ret = new Vector()
+objref grid_ind
+
+proc grid_search() {
+
+			for nt = 0, $1 {	//
+				mmtag= nt		
+				pc.submit("distscale",mmtag)
+			}
+
+	while (pc.working()) {	
+		key = pc.retval()	//retrieve the tag
+		pc.look_take(key)	//remove the tag/job from the bulletin
+   		vec_ret = pc.upkvec()
+    }
+}
+
+grid_search( n_trial-1)

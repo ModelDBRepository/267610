@@ -1,0 +1,5 @@
+Zang Y, Marder E, Marom S: Sodium channel slow inactivation normalizes firing in axons with uneven conductance distributions. Curr Biol 2023, 33:1-7.
+
+The main results in the manuscript have been simulated by using the code in ./multi_compartmental. The diameter was set to be 1 um.
+The ectopic spiking phenomenon is more obvious in thinner axons, which can be simply done by changing diameter.
+if you need more information, feel free to contact Yunliang Zang by ylzang@brandeis.edu.
